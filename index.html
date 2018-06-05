@@ -1,0 +1,506 @@
+<!DOCTYPE html>
+<head>
+<meta charset="utf-8">
+
+<style>
+
+body{
+	margin:0;
+	padding:0;
+
+}
+h1{
+	font-size:28.5px; 
+}
+.news-source{
+	
+	margin: 1px;
+	padding: 20px;
+	background: rgba(0,0,0,0.2);
+	
+}
+#left-info{
+	top: 40px;
+	position: absolute;
+	width:335px;
+	background-color: rgba(255,255,255,0.8);
+}
+#tooltip{
+	position: absolute;
+	display: none;
+	font-family: "Lucida Grande", sans-serif;
+	font-size: 10px;
+	background:rgba(20,20,20,0.5);
+	padding:1px;
+	color:#fff;
+	border:1px solid #000;
+	min-width: 100px;
+	text-align: center;
+}
+form{
+	position: absolute;
+}
+#chart{
+	text-align: center;
+	position:absolute;
+	bottom:0;
+	left:10%;
+	right:10%;
+	padding:20px;
+}
+#key{
+	width: 125px;
+	position: absolute;
+	bottom: 10px;
+	right: 20px;
+}
+#chart img{
+	width:450px;
+	margin-right:30px;
+	display:none;
+}
+.shift-text{
+	display: none;
+}
+</style>
+<script src="js/d3.v3.min.js"></script>
+<script src="js/d3.geo.projection.v0.min.js"></script>
+<!--<script src="http://d3js.org/queue.v1.min.js"></script>-->
+<script src="js/queue.min.js"></script>
+<script src="js/topojson.v1.min.js"></script>
+<script type="text/javascript" charset="utf-8" src="js/jquery-1.8.3.min.js"></script>
+<script src="bootstrap/js/bootstrap.min.js"></script>
+<link href="bootstrap/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body>
+<script>
+
+	function getQueryVariable(variable) {
+	    var query = window.location.search.substring(1);
+	    var vars = query.split('&');
+	    for (var i = 0; i < vars.length; i++) {
+	        var pair = vars[i].split('=');
+	        if (decodeURIComponent(pair[0]) == variable) {
+	            return decodeURIComponent(pair[1]);
+	        }
+	    }
+	    return null;
+	}
+	String.prototype.toTitleCase = function () {
+	    return this.replace(/\w\S*/g, function(txt){return txt.charAt(0).toUpperCase() + txt.substr(1).toLowerCase();});
+	};
+
+	$(document).ready(function() {
+    	if (getQueryVariable("i") != 0 )
+    		$('#myModal').modal();
+		if (getQueryVariable("sourceWeek")){
+			window.MAP_PROPERTY = getQueryVariable("sourceWeek");
+		} else {
+			window.MAP_PROPERTY = "bostonglobe_week1";
+		}
+		window.SOURCE = window.MAP_PROPERTY.substring(0, window.MAP_PROPERTY.length - 6);
+		window.WEEK = parseInt(window.MAP_PROPERTY.substring(window.MAP_PROPERTY.length - 1, window.MAP_PROPERTY.length));
+		
+		switch(window.SOURCE){
+			case "bostonglobe":
+				window.SOURCE_PROPER = "The Boston Globe";
+				break;
+			case "bbc":
+				window.SOURCE_PROPER = "BBC";
+				break;
+			case "nyt":
+				window.SOURCE_PROPER = "The New York Times";
+				break;
+			case "aljazeera":
+				window.SOURCE_PROPER = "Al Jazeera English";
+				break;
+		}
+		switch(parseInt(window.WEEK)){
+			case 1:
+				window.WEEK_PROPER = "Apr 7-13, 2013";
+				break;
+			case 2:
+				window.WEEK_PROPER = "Apr 14-20, 2013";
+				break;
+			case 3:
+				window.WEEK_PROPER = "Apr 21-27, 2013";
+				break;
+		}
+		$('#source-proper-name').text(window.SOURCE_PROPER);
+		$('#week-proper-name').text(window.WEEK_PROPER);
+		$('#chart img').hide();
+		if (window.WEEK > 1)
+			$("." + window.SOURCE + "-week" + (window.WEEK - 1) ).fadeIn();
+		else
+			$(".week1").fadeIn();
+		
+		if (window.WEEK < 3){
+			$('#see-next-week').html('<a href="index.html?i=0&sourceWeek=' + window.SOURCE + '_week' + (window.WEEK + 1) + '">See Next Week > </a>');
+		} else{
+			$('#see-next-week').html('<a href="index.html?i=0&sourceWeek=' + window.SOURCE + '_week1">Back to Week 1 > </a>');
+		}
+
+		console.log(window.SOURCE)
+		console.log(window.WEEK)
+
+	});
+</script>
+<div class="navbar navbar-fixed-top navbar-inverse">
+  <div class="navbar-inner">
+    <a class="brand" href="#" style="color:white;margin-left:0px">How Close to Home? Crisis, Attention and Geographic Bias During the Boston Marathon Bombings</a>
+    
+	<ul class="nav pull-right">
+      <li><a href="#myModal" role="button" data-toggle="modal" data-target="#myModal">About this project</a></li>
+     
+    </ul>
+  </div>
+</div>
+<div id="left-info">
+	
+	<h1 class="news-source"><span id="source-proper-name">Boston Globe</span> <br/><span id="week-proper-name">Apr 7-13, 2013</span></h1>
+	<h4  id="see-next-week" class="news-source"></h4>
+
+	<div id="tooltip"></div>
+	<p class="news-source" style="font-size:16px"><strong>SHIFT FROM LAST WEEK:</strong> 
+		<span class="shift-text week1">This is the baseline week prior to the crises.</span>
+		<span class="shift-text bostonglobe-week1">Russia coverage shoots up related to the Boston bombing. Higher than average Area of Focus coverage, but the Globe still shows a large shift towards Iraq. Slightly less attention paid to Texas.</span>
+		<span class="shift-text bostonglobe-week2">Area of Focus and Periphery coverage remain high. Russia coverage is still rising in relation to the local Boston story. Iraq coverage remains elevated and Syria coverage shows a significant jump. China and Texas decline significantly from prior weeks.</span>
+		<span class="shift-text nyt-week1">A spike in MA coverage corresponds to the bombings. Iraq gets about half that increase in attention while Texas shows a modest increase. The NYT shows a slight decrease in international (”Periphery”) coverage overall.</span>
+		<span class="shift-text nyt-week2">MA coverage begins to decline but remains high. Iraq shows another spike in attention and Syria shows a modest increase. Virtually no change in China attention despite the earthquake. International coverage returns to its Week 1 levels.</span>
+		<span class="shift-text bbc-week1">Notable attention shifts toward US, MA and TX. Almost 4 times more MA increase than TX. Shift away from Iraq (despite the bombings) and Russia. Almost no change in ratio of attention to Area of Focus & Periphery.</span>
+		<span class="shift-text bbc-week2">Equal shifts of attention to Syria and Russia (though increased Russian coverage was not exclusively related to Boston). Attention on TX declines faster than MA. Almost no change in ratio of attention to Area of Focus & Periphery.</span>
+		<span class="shift-text aljazeera-week1">Attention shift toward Periphery - drastic increase of MA and TX coverage, though the former receives far more attention. A slight decrease in Area of Focus attention despite heightened coverage of Iraq. Marked decrease in China coverage.</span>
+		<span class="shift-text aljazeera-week2">Equal shifts of attention to Syria and Russia (though increased Russian coverage was not exclusively related to Boston). Attention on TX declines faster than MA. Increase in China coverage. Almost no change in ratio of attention to Area of Focus & Periphery.</span>
+	</p>
+	<h4 class="news-source"><a href="#" class="dropdown-toggle" data-toggle="dropdown">
+	      Change News Source >
+	      
+	    </a>
+	    <ul class="dropdown-menu">
+	      <li><a href="index.html?i=0&sourceWeek=bostonglobe_week1">The Boston Globe</a></li>
+	      <li><a href="index.html?i=0&sourceWeek=nyt_week1">The New York Times</a></li>
+	      <li><a href="index.html?i=0&sourceWeek=bbc_week1">BBC</a></li>
+	      <li><a href="index.html?i=0&sourceWeek=aljazeera_week1">Al Jazeera English</a></li>
+	    </ul></h4>
+</div>
+<div id="chart">
+	<img class="bbc-week1" src="images/bbc_week1_expected.png">
+	<img class="bbc-week1" src="images/bbc_week1_unexpected.png">
+	<img class="bbc-week2" src="images/bbc_week2_expected.png">
+	
+	<img class="bostonglobe-week1" src="images/bostonglobe_week1_expected.png">
+	<img class="bostonglobe-week1"src="images/bostonglobe_week1_unexpected.png">
+	<img class="bostonglobe-week2"src="images/bostonglobe_week2_expected.png">
+	<img class="bostonglobe-week2"src="images/bostonglobe_week2_unexpected.png">
+	<img class="aljazeera-week1" src="images/aljazeera_week1_expected.png">
+	<img class="aljazeera-week1" src="images/aljazeera_week1_unexpected.png">
+	<img class="aljazeera-week2" src="images/aljazeera_week2_expected.png">
+	<img class="aljazeera-week2" src="images/aljazeera_week2_unexpected.png">
+	<img class="nyt-week1" src="images/nyt_week1_expected.png">
+	<img class="nyt-week1" src="images/nyt_week1_unexpected.png">
+	<img class="nyt-week2" src="images/nyt_week2_expected.png">
+	<img class="nyt-week2" src="images/nyt_week2_unexpected.png">
+</div>
+<div id="key"><img src="images/key.png"></div>
+<div id="tooltip"></div>
+<div id="myModal" class="modal hide fade" tabindex="-1" role="dialog" aria-labelledby="myModalLabel" aria-hidden="true">
+  <div class="modal-header">
+    <button type="button" class="close" data-dismiss="modal" aria-hidden="true">×</button>
+    <h3 id="myModalLabel">How Close to Home?<br> Crisis, Attention and Geographic Bias</h3>
+    <h4>By Catherine D'Ignazio and Luisa Beck at the MIT Center for Civic Media</h4>
+  </div>
+  <div class="modal-body">
+    <p>News coverage of tragic events often distills the unequal geographic distribution of media attention. On April 15th, 2013, international attention shifted to Boston, where two bombs exploded at the finish line of the Boston Marathon. In the same week, bomb blasts across Iraq killed 42 people, explosions at a Texas fertilizer plant killed 14, and a 7.0 magnitude earthquake left almost 200 dead in Sichuan province, China. The following week, 80 dead bodies were found in Damascus, Syria, after days of intense fighting.</p>
+    <p>While major news outlets did cover these events, it was not with the same intensity as the events in Boston and places connected with the events. In this analysis, we look to news sources at increasing distances from the marathon bombings to see how media attention shifted around the globe before, during and after the Boston bombings. </p>
+    <h4>Research Questions:</h4>
+    <ul>
+<li>Can we see evidence that the closer an event occurred to a news source’s geographic focus, the more attention it paid to the event? And did that attention stretch over a longer period of time?</li>
+<li>Did the international media pay a disproportionate amount of attention to the Boston bombings in comparison to other tragedies in Texas, Iraq and Syria, even if Boston usually stands in that news source’s periphery?</li>
+<li>How did attention paid to each of these events shift over time? Did stories closer to a news source's focus have a longer tail?</li>
+</ul>
+	<h4>To learn more about our preliminary findings, please <a href="http://civic.mit.edu/blog/kanarinka/how-close-to-home-crisis-attention-and-geographic-bias">read our write up</a> on the Center for Civic Media's blog.</h4>
+  </div>
+  <div class="modal-footer">
+    <a href="http://civic.mit.edu/blog/kanarinka/how-close-to-home-crisis-attention-and-geographic-bias" target="_blank" class="btn btn-primary pull-left">Read the full report</a>
+    <button class="btn btn-primary" data-dismiss="modal" aria-hidden="true">Explore the Maps</button>
+  </div>
+</div>
+
+<script>
+
+var width = $(window).width(),
+    height = 790;
+
+var svg = d3.select("body").append("svg")
+    .attr("width", width)
+    .attr("height", height);
+
+var rateById = d3.map();
+
+
+
+queue()
+    .defer(d3.json, "data/WorldAndStates.json")
+    .defer(d3.csv, "data/all_results.csv")
+    .await(ready);
+function ready(error, shapesData, propertiesData) {
+	var fillShape = function(d) { 
+    	if (d.properties.media_data){
+    		var val = d.properties.media_data[window.MAP_PROPERTY];
+    		//bad hack for returning extra bright color for outlying upper values
+    		/*if (val > mean * 10)
+    			return countryColors[countryColors.length -1];
+    		else*/
+	    		return quantize(val); 
+	    }
+	    else
+	    	return quantize(0); 
+    };
+	var countryColors = new Array(	"rgb(254, 240, 217)",
+									"rgb(253, 212, 158)",
+									"rgb(253, 187, 132)",
+									"rgb(252, 141, 89)",
+									"rgb(251, 106, 74)",
+									"rgb(179, 0, 0)");
+									/* PINK?!
+									"rgb(255, 245, 240)",
+									"rgb(254, 229, 217)",
+									"rgb(252, 174, 145)",
+									"rgb(251, 106, 74)",
+									"rgb(222, 45, 38)",
+									"rgb(165, 15, 21)");
+									*/
+	var mean = d3.mean(propertiesData, function(d) { return d[window.MAP_PROPERTY]; });
+	var max = d3.max(propertiesData, function(d) { return d[window.MAP_PROPERTY]; });
+
+	//custom function because different media outlets have different data 
+	//and need to tweak to show right data
+	var getDomainMax = function(mean, max){
+		switch(window.MAP_PROPERTY.substring(0,3)){
+			case "bbc":
+				return mean * 4;
+				break;
+			case "alj":
+				return max;
+				break;
+			case "bos":
+				return mean * 5;
+				break;
+			case "nyt":
+				return mean * 4;
+				break;
+
+		}
+	};
+	
+	
+	
+	var quantize = d3.scale.quantize()
+		//.domain([0, 30])
+	    .domain([0, getDomainMax(mean, max)])
+	    .range(d3.range(countryColors.length).map(function(i){ 
+	    	return countryColors[i]; 
+	    }));
+
+  	var projection = d3.geo.winkel3()
+	    .scale(240)
+	    .translate([width / 2, height / 2])
+	    .precision(.1)
+		.rotate([20, 0])
+		;
+  		/*d3.geo.ginzburg8()
+    	.scale(240)
+    	.translate([width / 2, height / 2])
+    	.precision(.1);*/
+    var hoverOn = function(d){
+	    	if (d.properties.media_data){ 
+	    		var mousePos = d3.mouse(this);
+	    		$('#tooltip').css("left", mousePos[0]).css("top", mousePos[1])
+	    		$('#tooltip').text(d.properties.media_data.name.toTitleCase() + " - " + d.properties.media_data[window.MAP_PROPERTY]);
+	    		$('#tooltip').show();
+	    	}  		
+	};
+	var hoverOff = function(d){	
+	    $('#tooltip').hide();
+	};
+
+	var path = d3.geo.path().projection(projection);
+	var graticule = d3.geo.graticule();
+
+	svg.append("defs").append("path")
+	    .datum({type: "Sphere"})
+	    .attr("id", "sphere")
+	    .attr("d", path);
+
+	svg.append("use")
+	    .attr("class", "stroke")
+	    .style("fill","none")
+	    .style("stroke","#000")
+	    .style("stroke-width","3px")
+	    .attr("xlink:href", "#sphere");
+
+	svg.append("path")
+    .datum(graticule)
+    .style("fill","none")
+	.style("stroke","#777")
+	.style("stroke-width",".5px")
+	.style("stroke-opacity",".5")
+    .attr("d", path);
+
+
+	 
+
+    var countryData = topojson.feature(shapesData, shapesData.objects.countries).features;
+	var stateData = topojson.feature(shapesData, shapesData.objects.states).features;
+	
+	propertiesData.forEach(function(e, i, a){
+		var state_code_number = e.state_code_number;
+		var country_code_number = e.country_code_number;
+		if (state_code_number != null && state_code_number > 0){
+			stateData.forEach(function(stateElement, i, a){
+				if (state_code_number == stateElement.id){
+					stateElement.properties["media_data"] = e;
+				}
+	   	 	});
+		} else {
+			countryData.forEach(function(countryElement, i, a){
+		    	if (country_code_number == countryElement.id){
+					countryElement.properties["media_data"] = e;
+				}
+	   	 	});
+		}
+		
+	});
+	svg.selectAll(".country")
+		    .data(countryData)
+		  	.enter().append("path")
+		    .attr("id", function(d) { 
+		    	return "country-" + d.id; 
+		    })
+		    .style("stroke","#666")
+		    .on("mouseover", hoverOn)
+	  		.on("mouseout", hoverOff)
+		    .style("stroke-width","0.5px")
+		    .attr("fill", fillShape)
+		    .attr("d", path);
+	
+                    
+	svg.selectAll(".state")
+	    .data(stateData)
+	    .attr("id", function(d) { 
+		    	return "state-" + d.id; 
+		    })
+	  	.enter().append("path")
+	  	.on("mouseover", hoverOn)
+	  	.on("mouseout", hoverOff)
+	    .style("stroke","#666")
+	    .style("stroke-width","0.5px")
+	    .attr("fill", fillShape)
+	    .attr("d", path);
+	
+
+	svg.selectAll(".stuff")
+	    .data(countryData)
+	  	.enter().append("text")
+	    .style("fill", "#444")
+	    .style("fill-opacity", "1")
+	    .style("font-size", "11px")
+	    .style("font-weight", "500")
+	    .style("text-anchor", "middle")
+	    .style("font-family", "\"Lucida Grande\", sans-serif")
+	    .attr("transform", function(d) { 
+	    	var centroid = path.centroid(d);
+	    	if (d.properties.media_data && d.properties.media_data.country_code_letter == "SY"){ 
+	    		var lineData = [ { "x": centroid[0],   "y": centroid[1]}];			
+
+	    		centroid[0] -= 30;
+	    		centroid[1] += 7;
+
+	    		lineData.push({"x": centroid[0] + 12,"y" : centroid[1]});
+
+	    		var lineFunction = d3.svg.line()
+                          .x(function(d) { return d.x; })
+                          .y(function(d) { return d.y; })
+                         .interpolate("linear");
+                svg.append("path")
+                            .attr("d", lineFunction(lineData))
+                            .attr("stroke", "#666")
+                            .attr("stroke-width", 1)
+                            .attr("fill", "none")
+                            .attr("class", "yosyria");
+
+	    		return "translate(" + centroid + ")"; 
+	    	} else if(d.properties.media_data && (d.properties.media_data.country_code_letter == "IQ" )){
+	    		centroid[0] -= 3;
+	    		return "translate(" + centroid + ")"; 
+	    	}else{
+	    		return "translate(" + centroid + ")"; 
+	    	} 
+	    })
+	    .attr("dy", ".35em")
+	    .text(function(d) { 
+	    	if (d.properties.media_data && 
+	    						(
+	    							d.properties.media_data.country_code_letter == "IQ" ||
+	    							d.properties.media_data.country_code_letter == "SY" ||
+	    							d.properties.media_data.country_code_letter == "RU" ||
+	    							d.properties.media_data.country_code_letter == "CN")
+	    						){
+	    						return d.properties.media_data.name.toTitleCase();
+	    					} else {
+	    						return "";
+	    					}  });
+	svg.selectAll(".stuff")
+	    .data(stateData)
+	  	.enter().append("text")
+	    .style("fill", "#666")
+	    .style("fill-opacity", "1")
+	    .style("font-size", "11px")
+	    .style("font-weight", "500")
+	    .style("text-anchor", "middle")
+	    .style("font-family", "\"Lucida Grande\", sans-serif")
+	    .attr("transform", function(d) { 
+	    	var centroid = path.centroid(d);
+	    	if (d.properties.media_data && d.properties.media_data.state_code_letter == "MA"){ 
+	    		
+	    		var lineData = [ { "x": centroid[0],   "y": centroid[1]}];			
+
+	    		centroid[0] += 52;
+	    		centroid[1] += 10;
+
+	    		lineData.push({"x": centroid[0] - 38,"y" : centroid[1]});
+
+	    		var lineFunction = d3.svg.line()
+                          .x(function(d) { return d.x; })
+                          .y(function(d) { return d.y; })
+                         .interpolate("linear");
+                svg.append("path")
+                            .attr("d", lineFunction(lineData))
+                            .attr("stroke", "#666")
+                            .attr("stroke-width", 1)
+                            .attr("fill", "none");
+	    		return "translate(" + centroid + ")"; 
+	    	} else if(d.properties.media_data && d.properties.media_data.state_code_letter == "TX"){
+	    		centroid[1] += 2;
+	    		return "translate(" + centroid + ")"; 
+	    	}else{
+	    		return "translate(" + centroid + ")"; 
+	    	}
+	    })
+	    .attr("dy", ".35em")
+	    .text(function(d) { 
+	    	if (d.properties.media_data && 
+	    						(
+	    							d.properties.media_data.state_code_letter == "MA" ||
+	    							d.properties.media_data.state_code_letter == "TX")
+	    						){
+	    						return d.properties.media_data.name.toTitleCase();
+	    					} else {
+	    						return "";
+	    					}  });
+
+
+    svg.select("#country-840").attr("fill", "none");
+}
+
+</script>

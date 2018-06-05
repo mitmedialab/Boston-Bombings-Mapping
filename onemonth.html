@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<head>
+<meta charset="utf-8">
+
+<style>
+
+body{
+	margin:0;
+	padding:0;
+
+}
+h1{
+	font-size:28.5px; 
+}
+.news-source{
+	
+	margin: 1px;
+	padding: 20px;
+	background: rgba(0,0,0,0.2);
+	
+}
+
+#tooltip{
+	position: absolute;
+	display: none;
+	font-family: "Lucida Grande", sans-serif;
+	font-size: 10px;
+	background:rgba(20,20,20,0.5);
+	padding:1px;
+	color:#fff;
+	border:1px solid #000;
+	min-width: 100px;
+	text-align: center;
+}
+#left-info{
+	top: 0;
+	position: absolute;
+	background-color: rgba(255,255,255,0.8);
+}
+form{
+	position: absolute;
+}
+
+#key{
+	width: 125px;
+	position: absolute;
+	bottom: 10px;
+	right: 20px;
+}
+.shift-text{
+	display: none;
+}
+</style>
+<script src="js/d3.v3.min.js"></script>
+<script src="js/d3.geo.projection.v0.min.js"></script>
+<!--<script src="http://d3js.org/queue.v1.min.js"></script>-->
+<script src="js/queue.min.js"></script>
+<script src="js/topojson.v1.min.js"></script>
+<script type="text/javascript" charset="utf-8" src="js/jquery-1.8.3.min.js"></script>
+<script src="bootstrap/js/bootstrap.min.js"></script>
+<link href="bootstrap/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body>
+<script>
+
+	function getQueryVariable(variable) {
+	    var query = window.location.search.substring(1);
+	    var vars = query.split('&');
+	    for (var i = 0; i < vars.length; i++) {
+	        var pair = vars[i].split('=');
+	        if (decodeURIComponent(pair[0]) == variable) {
+	            return decodeURIComponent(pair[1]);
+	        }
+	    }
+	    return null;
+	}
+	String.prototype.toTitleCase = function () {
+	    return this.replace(/\w\S*/g, function(txt){return txt.charAt(0).toUpperCase() + txt.substr(1).toLowerCase();});
+	};
+
+	$(document).ready(function() {
+    	
+
+	});
+</script>
+
+<div id="key"><img src="images/key.png"></div>
+<div id="tooltip"></div>
+<div id="left-info">
+	
+	<h1 class="news-source"><span id="source-proper-name"></span><br/>April 2013</h1>
+	<h4 class="news-source"><a href="#" class="dropdown-toggle" data-toggle="dropdown">
+	      Change News Source >
+	      
+	    </a>
+	    <ul class="dropdown-menu">
+	      <li><a href="onemonth.html?map=nyt">The New York Times</a></li>
+	      <li><a href="onemonth.html?map=bostonglobe">The Boston Globe</a></li>
+	      <li><a href="onemonth.html?map=indiatimes">Times of India</a></li>
+	      <li><a href="onemonth.html?map=redstate">RedState</a></li>
+	      <li><a href="onemonth.html?map=talkingpoints">Talking Points Memo</a></li>
+	      <li><a href="onemonth.html?map=bbc">BBC</a></li>
+	      <li><a href="onemonth.html?map=huffpo">The Huffington Post</a></li>
+	    </ul></h4>
+</div>
+<script>
+
+var width = $(window).width(),
+    height = 790;
+
+var svg = d3.select("body").append("svg")
+    .attr("width", width)
+    .attr("height", height);
+
+var rateById = d3.map();
+
+
+var source = getQueryVariable("map") == null ? "nyt" : getQueryVariable("map");
+window.MAP_PROPERTY = source + '_april2013';
+
+switch(source){
+	case "indiatimes":
+		window.SOURCE_PROPER = "The Times of India";
+		break;
+	case "bbc":
+		window.SOURCE_PROPER = "BBC";
+		break;
+	case "nyt":
+		window.SOURCE_PROPER = "The New York Times";
+		break;
+	case "huffpo":
+		window.SOURCE_PROPER = "The Huffington Post";
+		break;
+	case "redstate":
+		window.SOURCE_PROPER = "RedState";
+		break;
+	case "talkingpoints":
+		window.SOURCE_PROPER = "Talking Points Memo";
+		break;
+	case "bostonglobe":
+		window.SOURCE_PROPER = "The Boston Globe";
+		break;	
+}
+
+$('#source-proper-name').text(window.SOURCE_PROPER);
+
+queue()
+    .defer(d3.json, "data/world-50m.json")
+    .defer(d3.csv, "data/" + window.MAP_PROPERTY + "_results.csv")
+    .await(ready);
+
+function ready(error, shapesData, propertiesData) {
+	var fillShape = function(d) { 
+		
+		var result = "grey";
+    	if (d.properties.media_data){
+    		var val = d.properties.media_data[window.MAP_PROPERTY];
+    		
+    		if (val == 0)
+    			result = "#efefef";
+    		else {
+    			/*var scale = nyt_scale;
+    			switch(window.MAP_PROPERTY){
+    				case "huffpo_april2013":
+    					scale = huffpo_scale;
+    					break;
+    				case "indiatimes_april2013":
+    					scale = indiatimes_scale;
+    					break;
+    				case "bbc_april2013":
+    					scale = bbc_scale;
+    					break;
+    				
+    			}
+    			var i = scale.length-1;
+    			
+    			for (var i=scale.length-1;i>=0;i--)
+    			{
+    				if (val > parseInt(scale[i])){
+    					result = countryColors[i];
+    					break;
+    				}
+    			}*/
+    			var scaledVal = valToColorScale(val);
+    			return countryColors[Math.round(scaledVal)];
+    			
+	    		
+	    	}
+	    	
+	    }
+	    else
+	    	result = "#efefef";
+	    
+
+	    return result;
+    };
+	var countryColors = new Array(	"rgb(254, 240, 217)",
+									"rgb(253, 212, 158)",
+									"rgb(253, 187, 132)",
+									"rgb(252, 141, 89)",
+									"rgb(251, 106, 74)",
+									"rgb(179, 0, 0)");
+	/*var huffpo_scale = new Array(	"0",
+									"10",
+									"20",
+									"40",
+									"100",
+									"200");
+	var nyt_scale = new Array(		"0",
+									"10",
+									"20",
+									"40",
+									"100",
+									"300");
+	var bbc_scale = new Array(		"0",
+									"10",
+									"20",
+									"40",
+									"100",
+									"300");
+	var indiatimes_scale = new Array("0",
+									"20",
+									"40",
+									"100",
+									"300",
+									"2000");*/
+
+  	var projection = d3.geo.winkel3()
+	    .scale(240)
+	    .translate([width / 2, height / 2])
+	    .precision(.1)
+		.rotate([20, 0])
+		;
+	
+	var max = d3.max(propertiesData, function(d) { return parseInt(d[window.MAP_PROPERTY]); });
+	
+	var valToColorScale = d3.scale.log().domain([1, max]).range([0, 5]);
+    
+    var hoverOn = function(d){
+	    	if (d.properties.media_data){ 
+	    		var mousePos = d3.mouse(this);
+	    		$('#tooltip').css("left", mousePos[0]).css("top", mousePos[1])
+	    		$('#tooltip').text(d.properties.media_data.name.toTitleCase() + " - " + d.properties.media_data[window.MAP_PROPERTY]);
+	    		$('#tooltip').show();
+	    	}  		
+	};
+	var hoverOff = function(d){	
+	    $('#tooltip').hide();
+	};
+
+	var path = d3.geo.path().projection(projection);
+	var graticule = d3.geo.graticule();
+
+	svg.append("defs").append("path")
+	    .datum({type: "Sphere"})
+	    .attr("id", "sphere")
+	    .attr("d", path);
+
+	svg.append("use")
+	    .attr("class", "stroke")
+	    .style("fill","none")
+	    .style("stroke","#000")
+	    .style("stroke-width","3px")
+	    .attr("xlink:href", "#sphere");
+
+	svg.append("path")
+    .datum(graticule)
+    .style("fill","none")
+	.style("stroke","#777")
+	.style("stroke-width",".5px")
+	.style("stroke-opacity",".5")
+    .attr("d", path);
+
+
+	 
+
+    var countryData = topojson.feature(shapesData, shapesData.objects.countries).features;
+	//var stateData = topojson.feature(shapesData, shapesData.objects.states).features;
+	
+	propertiesData.forEach(function(e, i, a){
+		//var state_code_number = e.state_code_number;
+		var country_code_number = e.country_code_number;
+		/*if (state_code_number != null && state_code_number > 0){
+			stateData.forEach(function(stateElement, i, a){
+				if (state_code_number == stateElement.id){
+					stateElement.properties["media_data"] = e;
+				}
+	   	 	});
+		} else {*/
+			countryData.forEach(function(countryElement, i, a){
+		    	if (country_code_number == countryElement.id){
+					countryElement.properties["media_data"] = e;
+				}
+	   	 	});
+		/*}*/
+		
+	});
+	svg.selectAll(".country")
+		    .data(countryData)
+		  	.enter().append("path")
+		    .attr("id", function(d) { 
+		    	return "country-" + d.id; 
+		    })
+		    .style("stroke","#666")
+		    .on("mouseover", hoverOn)
+	  		.on("mouseout", hoverOff)
+		    .style("stroke-width","0.5px")
+		    .attr("fill", fillShape)
+		    .attr("d", path);
+	
+                    
+	/*svg.selectAll(".state")
+	    .data(stateData)
+	    .attr("id", function(d) { 
+		    	return "state-" + d.id; 
+		    })
+	  	.enter().append("path")
+	  	.on("mouseover", hoverOn)
+	  	.on("mouseout", hoverOff)
+	    .style("stroke","#666")
+	    .style("stroke-width","0.5px")
+	    .attr("fill", fillShape)
+	    .attr("d", path);
+	*/
+    //svg.select("#country-840").attr("fill", "none").style("stroke-width", "3.0").style("stroke", window.uscolor);
+}
+
+</script>
